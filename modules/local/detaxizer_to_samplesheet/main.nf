@@ -11,7 +11,13 @@ process DETAXIZER_TO_SAMPLESHEET {
     publishDir params.outdir, mode: 'copy'
 
     input:
-    val detaxizer_outdir // detaxizer's --outdir
+    // `path`, not `val`, so Nextflow stages it (resolving a relative value against the
+    // launch dir) rather than passing the string straight through to the script.
+    // `stageAs:` pins the staged directory name explicitly rather than relying on whatever
+    // the real detaxizer outdir happens to be called -- see fetchngs_to_samplesheet/main.nf
+    // for why an input/output basename collision is a real, reproduced bug, not a
+    // theoretical one.
+    path detaxizer_outdir, stageAs: 'input_detaxizer_outdir'
 
     output:
     path "samplesheet.csv", emit: samplesheet
@@ -24,5 +30,5 @@ process DETAXIZER_TO_SAMPLESHEET {
 }
 
 workflow {
-    DETAXIZER_TO_SAMPLESHEET(params.detaxizer_outdir)
+    DETAXIZER_TO_SAMPLESHEET(file(params.detaxizer_outdir))
 }

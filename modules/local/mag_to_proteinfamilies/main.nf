@@ -18,7 +18,12 @@ process MAG_TO_PROTEINFAMILIES {
     publishDir params.outdir, mode: 'copy'
 
     input:
-    val mag_outdir // mag's --outdir
+    // `path`, not `val`, so Nextflow stages it (resolving a relative value against the
+    // launch dir) rather than passing the string straight through to the script.
+    // `stageAs:` pins the staged directory name explicitly -- see
+    // fetchngs_to_samplesheet/main.nf for why an input/output basename collision is a real,
+    // reproduced bug, not a theoretical one.
+    path mag_outdir, stageAs: 'input_mag_outdir'
     val sample     // sample name for the single pooled row
     val assembler  // mag assembler directory, e.g. MEGAHIT
     val expect     // '' (default) skips the guard; an int fails unless exactly that many
@@ -41,7 +46,7 @@ process MAG_TO_PROTEINFAMILIES {
 
 workflow {
     MAG_TO_PROTEINFAMILIES(
-        params.mag_outdir,
+        file(params.mag_outdir),
         params.sample,
         params.assembler,
         params.expect,

@@ -15,7 +15,15 @@ process FETCHNGS_TO_SAMPLESHEET {
     publishDir params.outdir, mode: 'copy'
 
     input:
-    val fetchngs_samplesheet // path to an existing nf-core/fetchngs samplesheet.csv
+    // `path`, not `val`: Nextflow stages it into the task dir (resolving a relative value
+    // against the launch dir) rather than passing the string straight through to the
+    // script. `stageAs:` pins the staged name explicitly: fetchngs' own output is itself
+    // conventionally named samplesheet.csv, same as this process' own output below -- left
+    // to its default staged name (its original basename), the input and output would
+    // collide on disk, and the script's write-mode open() on that name would follow the
+    // staged symlink back and silently overwrite fetchngs' real output. Confirmed by
+    // reproducing it: the source file's content and md5 changed after a run.
+    path fetchngs_samplesheet, stageAs: 'input_samplesheet.csv'
     val strategy             // ENA library_strategy to keep, e.g. RNA-Seq / WGS / AMPLICON
     val target               // reads | detaxizer | mag
     val prefix               // sample-name prefix
@@ -34,7 +42,7 @@ process FETCHNGS_TO_SAMPLESHEET {
 
 workflow {
     FETCHNGS_TO_SAMPLESHEET(
-        params.fetchngs_samplesheet,
+        file(params.fetchngs_samplesheet),
         params.strategy,
         params.target,
         params.prefix,

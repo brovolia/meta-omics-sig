@@ -14,7 +14,11 @@ process METATDENOVO_TO_PROTEINFAMILIES {
     publishDir params.outdir, mode: 'copy'
 
     input:
-    val metatdenovo_outdir // metatdenovo's --outdir
+    // `path`, not `val`, so Nextflow stages it (resolving a relative value against the
+    // launch dir) rather than passing the string straight through. `stageAs:` pins the
+    // staged directory name explicitly -- see fetchngs_to_samplesheet/main.nf for why an
+    // input/output basename collision is a real, reproduced bug, not a theoretical one.
+    path metatdenovo_outdir, stageAs: 'input_metatdenovo_outdir'
     val sample             // sample name for the single row
 
     output:
@@ -29,7 +33,7 @@ process METATDENOVO_TO_PROTEINFAMILIES {
 
 workflow {
     METATDENOVO_TO_PROTEINFAMILIES(
-        params.metatdenovo_outdir,
+        file(params.metatdenovo_outdir),
         params.sample,
     )
 }

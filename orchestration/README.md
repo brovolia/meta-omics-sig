@@ -24,9 +24,10 @@ module run` commands, which means:
   `.config` with `tower { enabled = true }` and that step still gets a Platform run-watch
   link; leave it out and the step just runs.
 - Converters can become first-class DAG nodes instead of the manual gap between two
-  launches — **if** they're wrapped as Nextflow modules, since nf-meta's YAML only knows two
-  step shapes: `nf-pipeline` (`nextflow run`) and `nf-module` (`nextflow module run`), not
-  "run this script."
+  launches — wrapped as Nextflow modules and referenced as **`nf-pipeline`** steps pointed at
+  this repo with `main_script:` set, **not** as nf-meta's `nf-module` type. See "a wrong turn,
+  corrected" below for why: `nf-module` only resolves modules published to Seqera's own
+  module registry, not an arbitrary repo.
 
 ## What's here
 
@@ -56,8 +57,11 @@ inputs, no mocking — real script execution, real file I/O):
 [`lmo-chain.metapipeline.yaml`](lmo-chain.metapipeline.yaml) is the full chain written as one
 nf-meta config: fetchngs → {glue → mag → glue → proteinfamilies} / {glue → metatdenovo →
 glue → proteinfamilies → proteinannotator, the one edge with **no** glue step at all — see
-RUNS.md run 07}. **It passes `nf-meta validate`** (see "confirmed" below) but has not been
-run end to end — see "not done yet."
+RUNS.md run 07}. Each glue step is `nf-pipeline` + `main_script:`, pointed at
+`https://github.com/brovolia/meta-omics-sig` (this branch's fork) — see "a wrong turn,
+corrected" below for why not `nf-module`. It passes `nf-meta validate`, and two of the four
+glue steps (the simplest and the trickiest) have been run for real against that fork, not
+just validated — see "confirmed" below. The chain as a whole has not been run end to end.
 
 ## A wart worth knowing about: paths a converter creates vs. paths it only points at
 
@@ -72,38 +76,103 @@ that creates a new file nf-meta should chain on, check whether it needs the same
 the tell is whether the script's own `--selftest` resolves a path under a `tempfile`
 directory it created, the way `mag_to_proteinfamilies.py`'s does.
 
-## Confirmed by actually running `nf-meta validate` against this repo
+## A reproduced, fixed bug: input and output can silently collide on disk
 
-Not assumed — `nf-meta validate orchestration/lmo-chain.metapipeline.yaml` was run against
-the real, installed `nf-meta` 0.5.0 while writing this:
+Every module declares its path-like inputs as `path`, not `val` (see the comments in each
+`main.nf`) — necessary so Nextflow resolves a relative param value (what nf-meta actually
+produces, e.g. `out/01_fetchngs/samplesheet/samplesheet.csv`) against the launch directory
+and stages it into the task sandbox, rather than handing the literal string to the script,
+which would resolve it against the task's own work dir instead and fail with
+`FileNotFoundError`. That part is necessary and correct.
 
-- An `nf-module` step's `name:` is addressed exactly like an `nf-pipeline`'s:
-  `<org>/<repo>/<path-to-the-module-directory>`, e.g.
-  `vagkaratzas/meta-omics-sig/modules/local/fetchngs_to_samplesheet`. `version:` must be a
-  pinned tag or commit SHA — a branch name is rejected, same as for a pipeline step.
-- `nf-meta validate` fetches that module's `meta.yml` from GitHub at the pinned ref for
-  tier-2 param validation (hence a `meta.yml` next to every `main.nf` here) — it logs a
-  warning and skips that one check if the fetch 404s, which is what happens with this file's
-  placeholder `version: "0000000"` (no such commit exists yet). It does **not** fail the
-  whole validation.
-- **nf-module steps get no `-profile`/executor wiring from nf-meta.** `nf-pipeline` steps do
-  (`globals.profile`, per-workflow `profile:`); `nf-module` steps only get whatever
-  `container_engine:` or `config_file:` you set on that step directly (see
-  `src/nf_meta/runner/workflow_run.py` — `NfModuleRun.get_cmd` never emits `-profile`). nf-meta
-  prints exactly this warning when a module step has neither. **Every `nf-module` step in a
-  real (non-`--stub`) run on this cluster needs its own `container_engine: singularity` or
-  `config_file:`**, or it runs bare on whatever's on `$PATH`.
+The trap it opens: `fetchngs_to_samplesheet`'s output is named `samplesheet.csv`, and its
+input — a real nf-core/fetchngs samplesheet — is *conventionally also* named
+`samplesheet.csv` on disk. Left to Nextflow's default staging, the input is symlinked into
+the task dir under that same original basename, so input and output collide on the exact
+same filename. The script reads the input (fully, into memory) and only then opens the
+output path to write — same sequence, but now the "output path" and the "staged input
+symlink" are literally the same path. Writing through that symlink in `'w'` mode follows it
+back to the **original fetchngs output file on disk** and truncates it.
+
+Reproduced, not theorized: ran the module against a real relative-path setup (the same shape
+nf-meta produces), the source file's md5 changed after the run, and its content became the
+*converted* sheet instead of the original. Fixed with Nextflow's `stageAs:` on every
+module's path input, pinning the staged name explicitly (`input_samplesheet.csv`,
+`input_mag_outdir`, etc.) so it can never collide with whatever the process declares as its
+own output, regardless of what the real upstream pipeline happens to name its output.
+Re-ran the same reproduction after the fix: source md5 unchanged, converted output landed in
+its own separate file. If you add a converter module, give its `path` input a `stageAs:`
+too — don't rely on the input and output filenames happening not to collide.
+
+## A wrong turn, corrected: `nf-module` doesn't do what it sounds like
+
+The first version of this file used nf-meta's `type: nf-module` for the glue steps,
+addressed as `<org>/<repo>/<path-to-module-dir>` — e.g.
+`vagkaratzas/meta-omics-sig/modules/local/fetchngs_to_samplesheet`. That was wrong, caught
+only by actually testing it against a real pushed commit rather than trusting
+`nf-meta validate`'s "✓ Config is valid":
+
+- `nf-meta validate` only ever reported a 404 fetching each module's `meta.yml`, both before
+  and after the real push. Reading `get_module_schema()` in the installed `nf-meta` 0.5.0
+  shows why: it is **hardcoded** to `https://raw.githubusercontent.com/nf-core/modules/<ref>/
+  modules/<name>/meta.yml` — it always looks inside the canonical `nf-core/modules` registry
+  repo, using `name` as a subpath under `modules/`, regardless of what `name` actually is.
+  For a non-nf-core name this 404s by construction; the 404 said nothing about whether our
+  own repo/path was reachable, which is why it looked identical before and after pushing.
+- The real mechanism `type: nf-module` drives, `nextflow module run <name>@<version>`,
+  describes itself as "**Run a module directly from the registry**" in its own `--help` —
+  Seqera's `registry.nextflow.io`, a module *publishing* system (`nextflow module publish`),
+  unrelated to pulling an arbitrary git repo. Tried directly against the real pushed commit:
+
+  ```
+  $ nextflow module run brovolia/meta-omics-sig/modules/local/fetchngs_to_samplesheet@<sha> ...
+  Invalid module reference: brovolia/meta-omics-sig/modules/local/fetchngs_to_samplesheet@<sha>
+  ```
+
+  Nextflow rejects the reference outright. There is no way, in nf-meta 0.5.0, to address an
+  unpublished module in an arbitrary repo via `type: nf-module`.
+
+**The fix:** every glue step here is a plain `nf-pipeline` entry (the default `type`) with
+`url: https://github.com/brovolia/meta-omics-sig` and `main_script:` pointed at the module's
+`main.nf` — the same `nextflow run <url> -r <ref> -main-script <path>` mechanism every
+nf-core pipeline step in this file already uses, just pointed at a non-default entry script
+in a non-nf-core repo. `NfPipeline.main_script` exists in nf-meta's model precisely for this
+("Alternate entry script within the pipeline repo") and this path is confirmed working, not
+just structurally valid — see below. Bonus: `nf-pipeline` steps *do* get `-profile` wired
+from `globals.profile`, so this also fixes the "`nf-module` gets no executor wiring" gap the
+first version of this file warned about — that warning no longer applies to anything here.
+
+## Confirmed by actually running real commands against the real pushed fork
+
+Not nf-meta's own validation (see above for why that wasn't enough) — these commands were
+run directly:
+
+```bash
+nextflow run https://github.com/brovolia/meta-omics-sig \
+  -r <sha> -main-script modules/local/fetchngs_to_samplesheet/main.nf \
+  -params-file p.yaml
+```
+
+- `nextflow run <this fork> -r <sha> -main-script modules/local/<name>/main.nf` pulls the
+  real repo over git and executes the module — tried for `fetchngs_to_samplesheet` (simplest)
+  and `mag_to_proteinfamilies` (the one with the path-rewrite, see below): both `SUCCESS`,
+  both produced byte-identical output to running the module from a local checkout.
+- `nf-meta validate orchestration/lmo-chain.metapipeline.yaml` now reports "✓ Config is
+  valid" with a different, *honest* warning per glue step: `nextflow_schema.json not found
+  for https://github.com/brovolia/meta-omics-sig@<sha>`. That's correct and expected — this
+  repo has no root-level `nextflow_schema.json` (it isn't a full nf-core pipeline) — so
+  nf-meta's tier-2 param-schema check has nothing to check against. It is not a resolution
+  failure the way the `nf-module` 404 was.
 
 ## Not done yet / don't oversell this
 
-- **The chain has not been run end to end**, with or without `--stub`. The four modules are
-  verified individually against fixtures; `lmo-chain.metapipeline.yaml` is verified to parse
-  and validate, not to execute. Running `nf-meta run orchestration/lmo-chain.metapipeline.yaml
-  --stub` first (no containers, no real compute, just structure + param wiring) is the
-  natural next step, same as the nf-meta quickstart recommends for any new config.
-- `version: "0000000"` on every glue step is a literal placeholder. It must become this
-  branch's actual merge commit SHA (or a release tag, if these modules ever get tagged)
-  before any real run — nf-meta's own version-pinning rule, applied to itself.
+- **The full chain has not been run end to end.** Two of the four glue steps are confirmed
+  against the real pushed fork (above); all four are confirmed against fixtures
+  (`modules/local/*` table above); `lmo-chain.metapipeline.yaml` is confirmed to parse,
+  validate, and (for the two tested glue steps) pull-and-execute — not to run start to
+  finish. Running `nf-meta run orchestration/lmo-chain.metapipeline.yaml --stub` next (no
+  containers, no real compute, just structure + param wiring through every node, including
+  the five real nf-core pipeline steps) is the natural next step.
 - This does not replace a Seqera Platform launch for validating a *new* edge — do that by
   hand first, exactly as runs 01–08 did, so a human inspects what the edge actually produces.
   Wrap it as a module and add it here once it's proven, the way `PLAN.md`'s validation table
