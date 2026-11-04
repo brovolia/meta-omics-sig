@@ -37,6 +37,7 @@ Start at [README.md](README.md) for the overview.
 | Which issues has this project filed upstream? | [RUNS.md](RUNS.md) § Upstream issues filed from this project |
 | How should an AI agent work in this repo? Conventions, guardrails, environment gotchas | [AGENTS.md](AGENTS.md) |
 | What does this acronym mean? | [ACRONYMS.md](ACRONYMS.md) |
+| How is the chain actually *run*, as a single DAG rather than one launch per edge? | [orchestration/README.md](orchestration/README.md) |
 
 ## Runs
 

@@ -1,0 +1,38 @@
+name: mag_to_proteinfamilies
+description: >
+  Pool nf-core/mag's per-sample Prodigal proteins into the single pooled FASTA + one-row
+  samplesheet nf-core/proteinfamilies requires (sample,fasta). Thin Nextflow wrapper around
+  scripts/converters/mag_to_proteinfamilies.py -- see that script for the header-prefixing,
+  the --expect guard, and its --selftest.
+keywords:
+  - samplesheet
+  - mag
+  - proteinfamilies
+  - meta-omics-sig
+input:
+  - mag_outdir:
+      type: directory
+      description: nf-core/mag's --outdir
+  - outdir:
+      type: string
+      description: directory to publish the samplesheet and pooled FASTA into
+  - sample:
+      type: string
+      description: sample name for the single pooled row
+  - assembler:
+      type: string
+      description: mag assembler directory to read Prodigal output from (default MEGAHIT)
+  - expect:
+      type: integer
+      description: optional -- fail unless exactly this many per-sample Prodigal FASTAs are found
+output:
+  - samplesheet:
+      type: file
+      description: >
+        proteinfamilies samplesheet, published to <outdir>/samplesheet.csv; its fasta
+        column is rewritten to the pooled FASTA's published path, not its task-dir path
+  - pooled_fasta:
+      type: file
+      description: pooled, header-prefixed protein FASTA, published to <outdir>/<sample>.faa.gz
+authors:
+  - "@vagkaratzas"

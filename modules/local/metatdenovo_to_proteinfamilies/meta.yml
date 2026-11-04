@@ -1,0 +1,27 @@
+name: metatdenovo_to_proteinfamilies
+description: >
+  Build an nf-core/proteinfamilies samplesheet from nf-core/metatdenovo's protein FASTA,
+  whichever ORF caller produced it. Thin Nextflow wrapper around
+  scripts/converters/metatdenovo_to_proteinfamilies.py -- see that script for the
+  per-ORF-caller lookup, the transdecoder .pep.gz rejection, and its --selftest.
+keywords:
+  - samplesheet
+  - metatdenovo
+  - proteinfamilies
+  - meta-omics-sig
+input:
+  - metatdenovo_outdir:
+      type: directory
+      description: nf-core/metatdenovo's --outdir
+  - outdir:
+      type: string
+      description: directory to publish the samplesheet into
+  - sample:
+      type: string
+      description: sample name for the single row
+output:
+  - samplesheet:
+      type: file
+      description: proteinfamilies samplesheet, published to <outdir>/samplesheet.csv
+authors:
+  - "@vagkaratzas"

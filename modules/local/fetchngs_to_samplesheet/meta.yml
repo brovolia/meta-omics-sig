@@ -1,0 +1,30 @@
+name: fetchngs_to_samplesheet
+description: >
+  Convert an nf-core/fetchngs samplesheet into the column layout a downstream pipeline
+  (reads / detaxizer / mag) expects, with LMO-specific sample naming and mag's
+  group/platform columns. Thin Nextflow wrapper around
+  scripts/converters/fetchngs_to_reads_samplesheet.py -- see that script for the actual
+  conversion logic and its --selftest.
+keywords:
+  - samplesheet
+  - fetchngs
+  - meta-omics-sig
+input:
+  - fetchngs_samplesheet:
+      type: file
+      description: samplesheet.csv emitted by nf-core/fetchngs
+  - outdir:
+      type: string
+      description: directory to publish the converted samplesheet into
+  - strategy:
+      type: string
+      description: "ENA library_strategy to keep: RNA-Seq, WGS, or AMPLICON"
+  - target:
+      type: string
+      description: "output column layout: reads, detaxizer, or mag"
+output:
+  - samplesheet:
+      type: file
+      description: converted samplesheet, published to <outdir>/samplesheet.csv
+authors:
+  - "@vagkaratzas"

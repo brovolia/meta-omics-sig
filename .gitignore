@@ -1,6 +1,11 @@
 settings.json
 output/
 
+# Nextflow run artifacts, from testing modules/local/*/main.nf standalone or via nf-meta.
+.nextflow/
+.nextflow.log*
+work/
+
 # Generated on the cluster from the previous pipeline's output — contains absolute paths.
 runs/*/samplesheet.csv
 # Pooled protein FASTAs written by the converters next to the samplesheet — hundreds of MB.

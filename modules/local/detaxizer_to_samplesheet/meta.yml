@@ -1,0 +1,24 @@
+name: detaxizer_to_samplesheet
+description: >
+  Build a sample,fastq_1,fastq_2 samplesheet from nf-core/detaxizer's filtered reads, for
+  pipelines detaxizer's own --generate_pipeline_samplesheets does not cover (metatdenovo,
+  ampliseq, viralmetagenome). Thin Nextflow wrapper around
+  scripts/converters/detaxizer_to_reads_samplesheet.py -- see that script for the actual
+  conversion logic and its --selftest.
+keywords:
+  - samplesheet
+  - detaxizer
+  - meta-omics-sig
+input:
+  - detaxizer_outdir:
+      type: directory
+      description: nf-core/detaxizer's --outdir
+  - outdir:
+      type: string
+      description: directory to publish the samplesheet into
+output:
+  - samplesheet:
+      type: file
+      description: converted samplesheet, published to <outdir>/samplesheet.csv
+authors:
+  - "@vagkaratzas"

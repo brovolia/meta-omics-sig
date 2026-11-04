@@ -1,0 +1,121 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bmds-tue/nf-meta/refs/heads/main/schemas/metapipeline.schema.json
+#
+# Illustrative nf-meta representation of the LMO chain this project has already run and
+# recorded in RUNS.md (fetchngs 01 -> {mag 05 -> proteinfamilies 06} / {metatdenovo 02 ->
+# proteinfamilies 03 -> proteinannotator 07}), with the scripts/converters/ samplesheet
+# conversions wired in as modules/local/*/main.nf nf-module steps instead of a manual
+# "run script, then launch the next thing by hand" gap.
+#
+# NOT a drop-in replacement for the individual Seqera Platform launches already recorded in
+# RUNS.md -- see orchestration/README.md for what is and isn't verified here, in particular
+# the `name:`/`version:` addressing of the nf-module steps below, which is this file's one
+# unverified assumption. `outdir:` values are relative placeholders: never commit a real
+# absolute cluster path (see AGENTS.md).
+
+config_version: 0.3.0
+
+globals:
+  nextflow_version: "25.10"
+  # profile: singularity,slurm   # set to whatever this cluster's AGENTS.md profile is
+
+workflows:
+  # --- Data retrieval -------------------------------------------------------
+  n01_fetchngs:
+    name: nf-core/fetchngs
+    version: 1.13.0
+    params:
+      input: fetchngs-ids.csv # LMO accessions -- see RUNS.md run 01
+      outdir: out/01_fetchngs
+
+  # --- Metagenome (MG) branch: 01 -> glue -> mag -> glue -> proteinfamilies --
+  n02_mg_glue:
+    type: nf-module
+    from: n01_fetchngs
+    name: vagkaratzas/meta-omics-sig/modules/local/fetchngs_to_samplesheet
+    version: "0000000" # PLACEHOLDER -- replace with this branch's merge commit SHA (or a release tag) once merged; nf-meta requires a pinned revision
+    params:
+      fetchngs_samplesheet: ${n01_fetchngs:params:outdir}/samplesheet/samplesheet.csv
+      strategy: WGS
+      target: mag
+      prefix: LMO
+      group: "0"
+      outdir: out/02_mg_glue
+
+  n03_mag:
+    from: n02_mg_glue
+    name: nf-core/mag
+    version: 5.5.0
+    params:
+      input: ${n02_mg_glue:params:outdir}/samplesheet.csv
+      outdir: out/03_mag
+
+  n04_mg_proteinfamilies_glue:
+    type: nf-module
+    from: n03_mag
+    name: vagkaratzas/meta-omics-sig/modules/local/mag_to_proteinfamilies
+    version: "0000000" # PLACEHOLDER -- see n02_mg_glue above
+    params:
+      mag_outdir: ${n03_mag:params:outdir}
+      sample: LMO_MG_pooled
+      assembler: MEGAHIT
+      outdir: out/04_mg_proteinfamilies_glue
+
+  n05_proteinfamilies_mg:
+    from: n04_mg_proteinfamilies_glue
+    name: nf-core/proteinfamilies
+    version: 2.5.0
+    params:
+      input: ${n04_mg_proteinfamilies_glue:params:outdir}/samplesheet.csv
+      outdir: out/05_proteinfamilies_mg
+
+  # --- Metatranscriptome (MT) branch: 01 -> glue -> metatdenovo -> glue -> --
+  # --- proteinfamilies -> proteinannotator (no glue -- see below) ---------
+  n06_mt_glue:
+    type: nf-module
+    from: n01_fetchngs
+    name: vagkaratzas/meta-omics-sig/modules/local/fetchngs_to_samplesheet
+    version: "0000000" # PLACEHOLDER -- see n02_mg_glue above
+    params:
+      fetchngs_samplesheet: ${n01_fetchngs:params:outdir}/samplesheet/samplesheet.csv
+      strategy: RNA-Seq
+      target: reads
+      prefix: LMO
+      outdir: out/06_mt_glue
+
+  n07_metatdenovo:
+    from: n06_mt_glue
+    name: nf-core/metatdenovo
+    version: 1.4.0
+    params:
+      input: ${n06_mt_glue:params:outdir}/samplesheet.csv
+      outdir: out/07_metatdenovo
+
+  n08_mt_proteinfamilies_glue:
+    type: nf-module
+    from: n07_metatdenovo
+    name: vagkaratzas/meta-omics-sig/modules/local/metatdenovo_to_proteinfamilies
+    version: "0000000" # PLACEHOLDER -- see n02_mg_glue above
+    params:
+      metatdenovo_outdir: ${n07_metatdenovo:params:outdir}
+      sample: LMO_MT_coassembly
+      outdir: out/08_mt_proteinfamilies_glue
+
+  n09_proteinfamilies_mt:
+    from: n08_mt_proteinfamilies_glue
+    name: nf-core/proteinfamilies
+    version: 2.5.0
+    params:
+      input: ${n08_mt_proteinfamilies_glue:params:outdir}/samplesheet.csv
+      outdir: out/09_proteinfamilies_mt
+      # Emits proteinannotator/samplesheet.csv for n10 below -- RUNS.md's one edge with no
+      # converter at all (run 07): proteinfamilies' own sheet is proteinannotator's input
+      # unmodified, as long as n09's outdir isn't moved before n10 runs.
+      skip_proteinannotator_samplesheet: false
+
+  n10_proteinannotator:
+    from: n09_proteinfamilies_mt
+    name: nf-core/proteinannotator
+    version: 1.1.0
+    params:
+      input: ${n09_proteinfamilies_mt:params:outdir}/proteinannotator/samplesheet.csv
+      outdir: out/10_proteinannotator

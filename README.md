@@ -77,6 +77,8 @@ Two decisions gate all downstream work; neither is resolved yet:
 | [`RUNS.md`](RUNS.md) | Execution ledger — every pipeline run, with Seqera Platform provenance links |
 | `runs/<NN>_<pipeline>/` | Per-run inputs, params, and troubleshooting notes |
 | `scripts/converters/` | Samplesheet conversions between pipelines, each with a `--selftest` |
+| [`orchestration/README.md`](orchestration/README.md) | Running the chain as one [nf-meta](https://github.com/bmds-tue/nf-meta) DAG, converters included |
+| `modules/local/` | Converters wrapped as Nextflow modules, for orchestration's nf-meta `nf-module` steps |
 | `scripts/check_links.py` | Link-hygiene check for the vault — broken links, orphans, wikilinks |
 | `docs/` | Source for the [live site](https://vagkaratzas.github.io/meta-omics-sig/); `data.json` mirrors the PLAN.md validation table |
 | [`AGENTS.md`](AGENTS.md) | Bot/AI operational context — conventions, resource pointers, guardrails |
