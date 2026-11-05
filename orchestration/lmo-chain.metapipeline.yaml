@@ -32,13 +32,18 @@ workflows:
     params:
       input: runs/01_fetchngs/ids.csv # real accession list already in this repo -- see RUNS.md run 01
       outdir: out/01_fetchngs
+      # Metadata-only: a real (non-stub) run, so a real samplesheet.csv exists for n02/n06
+      # to actually consume -- but skips the ~35 GB FASTQ download RUNS.md run 01 needed,
+      # since this is for exercising the chain's wiring, not reproducing that run. Same
+      # metadata-only technique AGENTS.md already documents for probing a handoff cheaply.
+      skip_fastq_download: true
 
   # --- Metagenome (MG) branch: 01 -> glue -> mag -> glue -> proteinfamilies --
   n02_mg_glue:
     from: n01_fetchngs
     name: meta-omics-sig/fetchngs_to_samplesheet
     url: https://github.com/brovolia/meta-omics-sig
-    version: "3c377c7d38ac8cd7d5dcb431dee5f3732b4d0b2f"
+    version: "2b877b1f7646459bfbad0e124835cf83aab2d0d5"
     main_script: modules/local/fetchngs_to_samplesheet/main.nf
     params:
       fetchngs_samplesheet: ${n01_fetchngs:params:outdir}/samplesheet/samplesheet.csv
@@ -60,7 +65,7 @@ workflows:
     from: n03_mag
     name: meta-omics-sig/mag_to_proteinfamilies
     url: https://github.com/brovolia/meta-omics-sig
-    version: "3c377c7d38ac8cd7d5dcb431dee5f3732b4d0b2f"
+    version: "2b877b1f7646459bfbad0e124835cf83aab2d0d5"
     main_script: modules/local/mag_to_proteinfamilies/main.nf
     params:
       mag_outdir: ${n03_mag:params:outdir}
@@ -82,7 +87,7 @@ workflows:
     from: n01_fetchngs
     name: meta-omics-sig/fetchngs_to_samplesheet
     url: https://github.com/brovolia/meta-omics-sig
-    version: "3c377c7d38ac8cd7d5dcb431dee5f3732b4d0b2f"
+    version: "2b877b1f7646459bfbad0e124835cf83aab2d0d5"
     main_script: modules/local/fetchngs_to_samplesheet/main.nf
     params:
       fetchngs_samplesheet: ${n01_fetchngs:params:outdir}/samplesheet/samplesheet.csv
@@ -103,7 +108,7 @@ workflows:
     from: n07_metatdenovo
     name: meta-omics-sig/metatdenovo_to_proteinfamilies
     url: https://github.com/brovolia/meta-omics-sig
-    version: "3c377c7d38ac8cd7d5dcb431dee5f3732b4d0b2f"
+    version: "2b877b1f7646459bfbad0e124835cf83aab2d0d5"
     main_script: modules/local/metatdenovo_to_proteinfamilies/main.nf
     params:
       metatdenovo_outdir: ${n07_metatdenovo:params:outdir}
