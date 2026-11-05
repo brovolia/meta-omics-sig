@@ -23,13 +23,21 @@ and an optional reverse FASTQ; only the column *names* differ, so `--target` pic
                         `group` is a study-design decision no upstream pipeline can supply -
                         see --group.
 
-Two things this fixes beyond renaming columns:
+Three things this fixes beyond renaming columns:
 
 1. fetchngs sets `sample` to the ENA *experiment* accession (ERX...), so without a rename
    every downstream result is labelled ERX13368357 instead of something meaningful.
 2. Sample names are built from `collection_date`, never `sample_alias`. For LMO's
    PRJEB82694 the aliases carry pre-correction dates and disagree with `collection_date`
    for 23 of 26 samples; ENA aliases are immutable so this will not be fixed upstream.
+3. With `--skip_fastq_download`, fetchngs passes ENA's `fastq_ftp` field straight through,
+   and that field is scheme-less by design (e.g. `ftp.sra.ebi.ac.uk/vol1/...`) -- fine for
+   a human reading a report, but a downstream pipeline's schema validator (mag, etc.) reads
+   a scheme-less value as a literal local path, which does not exist, and fails loudly. A
+   real fetchngs download instead leaves a real local path here (it already has a scheme
+   in neither sense -- it is just `/abs/path/to.fastq.gz`), so this only needs to add
+   `ftp://` to values that look like ENA's bare host+path form, never to an actual local
+   path or to a value that already carries a scheme.
 
 Usage:
     fetchngs_to_reads_samplesheet.py IN.csv OUT.csv --strategy RNA-Seq [--prefix LMO]
@@ -75,6 +83,16 @@ MAG_SHORT_READ_PLATFORMS = {
 # Replicate suffix as written in LMO sample aliases: "..._a" or "...:repl-a".
 REPLICATE = re.compile(r"(?:_|repl-)([a-z])$")
 
+URL_SCHEME = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://")
+
+
+def with_scheme(path):
+    """Restore the `ftp://` ENA's fastq_ftp field drops, without touching a real local
+    path (which starts with `/`) or a value that already has a scheme."""
+    if not path or path.startswith("/") or URL_SCHEME.match(path):
+        return path
+    return f"ftp://{path}"
+
 
 def sample_name(row, prefix):
     """Build a stable, meaningful sample id from the corrected collection date."""
@@ -97,8 +115,8 @@ def convert(rows, strategy, prefix, group="0"):
         out.append(
             {
                 "sample": sample_name(row, prefix),
-                "fastq_1": row["fastq_1"],
-                "fastq_2": row.get("fastq_2", ""),
+                "fastq_1": with_scheme(row["fastq_1"]),
+                "fastq_2": with_scheme(row.get("fastq_2", "")),
                 # Only consumed by --target mag. `group` is a study-design decision that no
                 # upstream pipeline can supply: in mag it selects which samples share a
                 # co-abundance binning set, so one group across all samples gives every
@@ -166,6 +184,19 @@ def selftest():
     mt = convert(rows, "RNA-Seq", "LMO")
     assert [r["sample"] for r in mt] == ["LMO_20160315_MT_a", "LMO_20160315_MT_b"], mt
     assert mt[0]["fastq_2"] == "/d/a_2.fastq.gz"
+
+    # with_scheme: a real local path (--skip_fastq_download off) is left alone, a value
+    # that already has a scheme is left alone, and ENA's bare fastq_ftp form gets ftp://
+    # restored so a downstream schema validator reads it as remote, not as a missing file.
+    assert with_scheme("/d/a_1.fastq.gz") == "/d/a_1.fastq.gz"
+    assert with_scheme("https://example.org/a_1.fastq.gz") == "https://example.org/a_1.fastq.gz"
+    assert with_scheme("") == ""
+    bare = "ftp.sra.ebi.ac.uk/vol1/fastq/ERR139/064/ERR13967264/ERR13967264_1.fastq.gz"
+    assert with_scheme(bare) == f"ftp://{bare}"
+
+    bare_rows = [dict(rows[2], fastq_1=bare, fastq_2=bare.replace("_1.", "_2."))]
+    bare_mg = convert(bare_rows, "WGS", "LMO")
+    assert bare_mg[0]["fastq_1"] == f"ftp://{bare}", bare_mg
 
     mg = convert(rows, "WGS", "LMO")
     assert mg[0]["sample"] == "LMO_20160315_MG_a", mg  # collection_date wins over alias
