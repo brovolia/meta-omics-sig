@@ -22,7 +22,10 @@ globals:
   # 26, not 25.10 (nf-meta's own doc example, which this was copied from) -- nf-meta hard-fails
   # on a MAJOR-version mismatch only, and this cluster's real baseline is 26.04+ (AGENTS.md).
   nextflow_version: "26.04"
-  # profile: singularity,slurm   # set to whatever this cluster's AGENTS.md profile is
+  # ccga_cau is this cluster's own nf-core/configs institutional profile (caucluster,
+  # i.e. CAU Kiel) -- sets singularity.enabled, executor=slurm and queue=base in one go,
+  # so no bare `singularity,slurm` generic-profile guess is needed.
+  profile: ccga_cau
 
 workflows:
   # --- Data retrieval -------------------------------------------------------
@@ -43,7 +46,7 @@ workflows:
     from: n01_fetchngs
     name: meta-omics-sig/fetchngs_to_samplesheet
     url: https://github.com/brovolia/meta-omics-sig
-    version: "2b877b1f7646459bfbad0e124835cf83aab2d0d5"
+    version: "ef2557a7638a6be56285c7c5c99e42cb3fae11a8"
     main_script: modules/local/fetchngs_to_samplesheet/main.nf
     params:
       fetchngs_samplesheet: ${n01_fetchngs:params:outdir}/samplesheet/samplesheet.csv
@@ -65,7 +68,7 @@ workflows:
     from: n03_mag
     name: meta-omics-sig/mag_to_proteinfamilies
     url: https://github.com/brovolia/meta-omics-sig
-    version: "2b877b1f7646459bfbad0e124835cf83aab2d0d5"
+    version: "ef2557a7638a6be56285c7c5c99e42cb3fae11a8"
     main_script: modules/local/mag_to_proteinfamilies/main.nf
     params:
       mag_outdir: ${n03_mag:params:outdir}
@@ -87,7 +90,7 @@ workflows:
     from: n01_fetchngs
     name: meta-omics-sig/fetchngs_to_samplesheet
     url: https://github.com/brovolia/meta-omics-sig
-    version: "2b877b1f7646459bfbad0e124835cf83aab2d0d5"
+    version: "ef2557a7638a6be56285c7c5c99e42cb3fae11a8"
     main_script: modules/local/fetchngs_to_samplesheet/main.nf
     params:
       fetchngs_samplesheet: ${n01_fetchngs:params:outdir}/samplesheet/samplesheet.csv
@@ -108,7 +111,7 @@ workflows:
     from: n07_metatdenovo
     name: meta-omics-sig/metatdenovo_to_proteinfamilies
     url: https://github.com/brovolia/meta-omics-sig
-    version: "2b877b1f7646459bfbad0e124835cf83aab2d0d5"
+    version: "ef2557a7638a6be56285c7c5c99e42cb3fae11a8"
     main_script: modules/local/metatdenovo_to_proteinfamilies/main.nf
     params:
       metatdenovo_outdir: ${n07_metatdenovo:params:outdir}

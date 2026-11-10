@@ -36,8 +36,14 @@ Three things this fixes beyond renaming columns:
    a scheme-less value as a literal local path, which does not exist, and fails loudly. A
    real fetchngs download instead leaves a real local path here (it already has a scheme
    in neither sense -- it is just `/abs/path/to.fastq.gz`), so this only needs to add
-   `ftp://` to values that look like ENA's bare host+path form, never to an actual local
+   a scheme to values that look like ENA's bare host+path form, never to an actual local
    path or to a value that already carries a scheme.
+
+   The scheme added is `https://`, not the `ftp://` the field name suggests: Nextflow's
+   FilePorter opens one connection per input file in parallel, and ENA's FTP server drops
+   or truncates mid-transfer under that load on multi-GB fastq.gz files (seen directly:
+   `Read data length does not match expected size`, retried 3x, still truncated). ENA
+   mirrors every FTP path at the identical HTTPS URL, which does not have this problem.
 
 Usage:
     fetchngs_to_reads_samplesheet.py IN.csv OUT.csv --strategy RNA-Seq [--prefix LMO]
@@ -87,11 +93,12 @@ URL_SCHEME = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://")
 
 
 def with_scheme(path):
-    """Restore the `ftp://` ENA's fastq_ftp field drops, without touching a real local
-    path (which starts with `/`) or a value that already has a scheme."""
+    """Restore the scheme ENA's fastq_ftp field drops, as `https://` rather than the
+    `ftp://` the field name suggests (see module docstring point 3), without touching a
+    real local path (which starts with `/`) or a value that already has a scheme."""
     if not path or path.startswith("/") or URL_SCHEME.match(path):
         return path
-    return f"ftp://{path}"
+    return f"https://{path}"
 
 
 def sample_name(row, prefix):
@@ -186,17 +193,19 @@ def selftest():
     assert mt[0]["fastq_2"] == "/d/a_2.fastq.gz"
 
     # with_scheme: a real local path (--skip_fastq_download off) is left alone, a value
-    # that already has a scheme is left alone, and ENA's bare fastq_ftp form gets ftp://
-    # restored so a downstream schema validator reads it as remote, not as a missing file.
+    # that already has a scheme is left alone, and ENA's bare fastq_ftp form gets https://
+    # added (not ftp://, see module docstring point 3) so a downstream schema validator
+    # reads it as remote, not as a missing file.
     assert with_scheme("/d/a_1.fastq.gz") == "/d/a_1.fastq.gz"
     assert with_scheme("https://example.org/a_1.fastq.gz") == "https://example.org/a_1.fastq.gz"
+    assert with_scheme("ftp://example.org/a_1.fastq.gz") == "ftp://example.org/a_1.fastq.gz"
     assert with_scheme("") == ""
     bare = "ftp.sra.ebi.ac.uk/vol1/fastq/ERR139/064/ERR13967264/ERR13967264_1.fastq.gz"
-    assert with_scheme(bare) == f"ftp://{bare}"
+    assert with_scheme(bare) == f"https://{bare}"
 
     bare_rows = [dict(rows[2], fastq_1=bare, fastq_2=bare.replace("_1.", "_2."))]
     bare_mg = convert(bare_rows, "WGS", "LMO")
-    assert bare_mg[0]["fastq_1"] == f"ftp://{bare}", bare_mg
+    assert bare_mg[0]["fastq_1"] == f"https://{bare}", bare_mg
 
     mg = convert(rows, "WGS", "LMO")
     assert mg[0]["sample"] == "LMO_20160315_MG_a", mg  # collection_date wins over alias
