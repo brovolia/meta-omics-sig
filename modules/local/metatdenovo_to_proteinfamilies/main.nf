@@ -31,7 +31,7 @@ process METATDENOVO_TO_PROTEINFAMILIES {
 
     script:
     """
-    python3 ${moduleDir}/../../../scripts/converters/metatdenovo_to_proteinfamilies.py \\
+    python3 ${moduleDir.resolve('../../../scripts/converters/metatdenovo_to_proteinfamilies.py').normalize()} \\
         '${metatdenovo_outdir}' samplesheet.csv --sample '${sample}'
     """
 }

@@ -40,7 +40,7 @@ process FETCHNGS_TO_SAMPLESHEET {
 
     script:
     """
-    python3 ${moduleDir}/../../../scripts/converters/fetchngs_to_reads_samplesheet.py \\
+    python3 ${moduleDir.resolve('../../../scripts/converters/fetchngs_to_reads_samplesheet.py').normalize()} \\
         '${fetchngs_samplesheet}' samplesheet.csv \\
         --strategy '${strategy}' --target '${target}' --prefix '${prefix}' --group '${group}'
     """

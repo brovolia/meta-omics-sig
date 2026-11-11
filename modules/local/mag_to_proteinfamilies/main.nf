@@ -41,7 +41,7 @@ process MAG_TO_PROTEINFAMILIES {
     script:
     def expect_arg = expect ? "--expect ${expect}" : ''
     """
-    python3 ${moduleDir}/../../../scripts/converters/mag_to_proteinfamilies.py \\
+    python3 ${moduleDir.resolve('../../../scripts/converters/mag_to_proteinfamilies.py').normalize()} \\
         '${mag_outdir}' samplesheet.csv '${sample}.faa.gz' \\
         --sample '${sample}' --assembler '${assembler}' ${expect_arg}
 

@@ -29,7 +29,7 @@ process DETAXIZER_TO_SAMPLESHEET {
 
     script:
     """
-    python3 ${moduleDir}/../../../scripts/converters/detaxizer_to_reads_samplesheet.py \\
+    python3 ${moduleDir.resolve('../../../scripts/converters/detaxizer_to_reads_samplesheet.py').normalize()} \\
         '${detaxizer_outdir}' samplesheet.csv
     """
 }
