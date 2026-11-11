@@ -95,8 +95,13 @@ URL_SCHEME = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://")
 def with_scheme(path):
     """Restore the scheme ENA's fastq_ftp field drops, as `https://` rather than the
     `ftp://` the field name suggests (see module docstring point 3), without touching a
-    real local path (which starts with `/`) or a value that already has a scheme."""
+    real local path -- absolute (starts with `/`) or relative (first segment is a plain
+    directory name) -- or a value that already has a scheme. ENA's bare fastq_ftp form
+    always starts with a dotted hostname segment (e.g. ftp.sra.ebi.ac.uk/...); a real
+    local path's first segment never contains a dot."""
     if not path or path.startswith("/") or URL_SCHEME.match(path):
+        return path
+    if "." not in path.split("/", 1)[0]:
         return path
     return f"https://{path}"
 
@@ -197,6 +202,7 @@ def selftest():
     # added (not ftp://, see module docstring point 3) so a downstream schema validator
     # reads it as remote, not as a missing file.
     assert with_scheme("/d/a_1.fastq.gz") == "/d/a_1.fastq.gz"
+    assert with_scheme("out/01_fetchngs/fastq/x_1.fastq.gz") == "out/01_fetchngs/fastq/x_1.fastq.gz"
     assert with_scheme("https://example.org/a_1.fastq.gz") == "https://example.org/a_1.fastq.gz"
     assert with_scheme("ftp://example.org/a_1.fastq.gz") == "ftp://example.org/a_1.fastq.gz"
     assert with_scheme("") == ""
