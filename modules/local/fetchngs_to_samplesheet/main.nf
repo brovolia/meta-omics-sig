@@ -17,7 +17,7 @@ process FETCHNGS_TO_SAMPLESHEET {
     // above -- living outside the work dir, under this repo's own checkout -- is
     // otherwise invisible inside the container: `python3: can't open file '.../
     // scripts/converters/fetchngs_to_reads_samplesheet.py': No such file or directory`.
-    containerOptions "-B ${moduleDir}/../../../scripts:${moduleDir}/../../../scripts"
+    containerOptions "-B ${moduleDir.resolve('../../../scripts').normalize()}"
     publishDir params.outdir, mode: 'copy'
 
     input:

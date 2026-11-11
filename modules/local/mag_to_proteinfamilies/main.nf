@@ -19,7 +19,7 @@ process MAG_TO_PROTEINFAMILIES {
     // (same gap already documented for PROKKA in AGENTS.md), so the converter script
     // above -- living outside the work dir, under this repo's own checkout -- is
     // otherwise invisible inside the container.
-    containerOptions "-B ${moduleDir}/../../../scripts:${moduleDir}/../../../scripts"
+    containerOptions "-B ${moduleDir.resolve('../../../scripts').normalize()}"
     publishDir params.outdir, mode: 'copy'
 
     input:
