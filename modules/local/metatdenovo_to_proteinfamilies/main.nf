@@ -11,6 +11,11 @@
 process METATDENOVO_TO_PROTEINFAMILIES {
     tag "$sample"
     container 'python:3.12-slim'
+    // Singularity on this cluster's ccga_cau profile only auto-mounts the task work dir
+    // (same gap already documented for PROKKA in AGENTS.md), so the converter script
+    // above -- living outside the work dir, under this repo's own checkout -- is
+    // otherwise invisible inside the container.
+    containerOptions "-B ${moduleDir}/../../../scripts:${moduleDir}/../../../scripts"
     publishDir params.outdir, mode: 'copy'
 
     input:
